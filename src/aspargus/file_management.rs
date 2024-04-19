@@ -90,14 +90,6 @@ pub fn rename_file(original_path: &str, new_path: &str) -> anyhow::Result<()> {
 
 pub fn create_new_file_name(video: &Video, template: &str) -> String {
     let creation_date = video.creation_date;
-    // let title = "Zsolna fait du vélo";
-    // let keywords = [
-    //     "zsolna".to_string(),
-    //     "vélo".to_string(),
-    //     "extérieur".to_string(),
-    // ];
-    //let file = "/Users/pierre/thevideo.mp4";
-    //let template = "%Y-%M-%D_%T_%K".to_string();
     let mut new_name = template.to_string();
     new_name = new_name.replace("%Y", creation_date.year().to_string().as_str());
     new_name = new_name.replace("%M", creation_date.format("%m").to_string().as_str());

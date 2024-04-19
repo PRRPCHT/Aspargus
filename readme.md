@@ -1,14 +1,16 @@
-# What is Aspargus?
+# Aspargus
+
+## What is Aspargus?
 
 The idea behind Aspargus is to have an automated solution to properly identify home videos. All those videos one makes of their kids, family... that are stored in folder with very unpractical names. Why not leverage the power of AI to give a preview of what's happening in the video?
 
-# How does it work?
+## How does it work?
 
 Aspargus uses [Ollama](https://ollama.com/) and 2 models to first understand what's happening in the video and then create a title, a description and keywords for that video. We can recommend LlaVa and Mistral as models but you can use any other model if you want. Please make sure that Ollama is installed and running on your machine before running Aspargus. Please refer to [Ollama](https://ollama.com/) documentation on how to download a model.
 
 Aspargus also uses [FFMPEG](https://ffmpeg.org/) and FFPROBE to extract frames from the videos. Please make sure that FFMPEG and FFPROBE are installed on your machine and in the path before running Aspargus.
 
-# How to run Aspargus?
+## How to run Aspargus?
 
 Aspargus runs in your terminal and therefore takes arguments to execute :
 
@@ -29,7 +31,7 @@ Aspargus runs in your terminal and therefore takes arguments to execute :
 
 At least the path of a video file or a path to a folder must be given in order for Aspargus to run.
 
-# Examples
+## Examples
 
 - `aspargus -f /path/to/folder -s avideo.mp4 -e myvideo.mp4 -r  "%Y-%M-%D_%T_%K" -t llama3:instruct` analyses all the videos from the given folder in alphabetical order from `avideo.mp4` to `myvideo.mp4` (including) and renames all the files according to the given template:
   ```
@@ -38,7 +40,11 @@ At least the path of a video file or a path to a folder must be given in order f
   It also specifies `llama3:instruct` as the new text processing model.
 - `aspargus /path/to/video1.mp4 /another/path/to/video2.mp4 -j /third/path/to/file.json` analyzes two videos and stores the metadata in the specified JSON file.
 
-# Constraints, known issues and limitations
+## Constraints, known issues and limitations
 
 - Be careful when choosing your models, as it can take a lot of time to perform the frame analysis and/or the text generation depending on your hardware. The default models are 7B models that can run decently on pretty much any hardware.
 - As Aspargus uses 2 models for computer vision and text generation, all the computer vision tasks are run then the text generation ones in order to avoid loading the models every time. It can be an improvement in the future.
+
+## Licence
+
+MIT licence.

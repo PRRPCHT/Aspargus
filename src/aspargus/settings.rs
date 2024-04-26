@@ -6,7 +6,9 @@ use super::file_management;
 
 #[derive(Default, Deserialize, Serialize, Debug)]
 pub struct AspargusSettings {
+    #[serde(default = "get_default_cv_model")]
     pub computer_vision_model: String,
+    #[serde(default = "get_default_text_model")]
     pub text_model: String,
     #[serde(skip_serializing, skip_deserializing)]
     pub work_folder: String,
@@ -14,6 +16,30 @@ pub struct AspargusSettings {
     pub temp_folder: String,
     #[serde(skip_serializing, skip_deserializing)]
     pub settings_path: String,
+    #[serde(default = "get_default_server_url")]
+    pub computer_vision_server: String,
+    #[serde(default = "get_default_server_url")]
+    pub text_server: String,
+    #[serde(default = "get_default_server_port")]
+    pub computer_vision_server_port: u16,
+    #[serde(default = "get_default_server_port")]
+    pub text_server_port: u16,
+}
+
+fn get_default_cv_model() -> String {
+    "llava".to_string()
+}
+
+fn get_default_text_model() -> String {
+    "mistral".to_string()
+}
+
+fn get_default_server_url() -> String {
+    "http://localhost".to_string()
+}
+
+fn get_default_server_port() -> u16 {
+    11434
 }
 
 pub fn load_settings() -> AspargusSettings {
@@ -34,11 +60,15 @@ pub fn load_settings() -> AspargusSettings {
         Err(_) => {
             log::debug!("No settings file found, creating a new one");
             let aspargus_settings = AspargusSettings {
-                computer_vision_model: "llava".to_string(),
-                text_model: "mistral".to_string(),
+                computer_vision_model: get_default_cv_model(),
+                text_model: get_default_text_model(),
                 work_folder: work_folder,
                 temp_folder: temp_folder,
                 settings_path: settings_path.to_str().unwrap().to_string(),
+                computer_vision_server: get_default_server_url(),
+                text_server: get_default_server_url(),
+                computer_vision_server_port: get_default_server_port(),
+                text_server_port: get_default_server_port(),
             };
             save_settings(&aspargus_settings).expect("Saving settings file");
             aspargus_settings

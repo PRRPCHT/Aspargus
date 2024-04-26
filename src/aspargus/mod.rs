@@ -66,18 +66,24 @@ impl Video {
 pub(crate) struct Aspargus {
     videos: Vec<Video>,
     settings: AspargusSettings,
-    ollama: Ollama,
+    cv_ollama: Ollama,
+    text_ollama: Ollama,
     videos_number: i32,
 }
 
 impl Aspargus {
     pub fn new() -> Self {
         let settings = settings::load_settings();
+        let computer_vision_server = settings.computer_vision_server.clone();
+        let computer_vision_server_port = settings.computer_vision_server_port.clone();
+        let text_server = settings.text_server.clone();
+        let text_server_port = settings.text_server_port.clone();
         log::debug!("Temp folder: {}", settings.temp_folder);
         Self {
             videos: Vec::new(),
             settings,
-            ollama: Ollama::default(),
+            cv_ollama: Ollama::new(computer_vision_server, computer_vision_server_port),
+            text_ollama: Ollama::new(text_server, text_server_port),
             videos_number: 0,
         }
     }
@@ -92,6 +98,22 @@ impl Aspargus {
 
     pub fn set_text_model(&mut self, model: String) {
         self.settings.text_model = model;
+        match settings::save_settings(&self.settings) {
+            Ok(_) => (),
+            Err(error) => log::error!("{}", error),
+        }
+    }
+
+    pub fn set_computer_vision_server(&mut self, server: String) {
+        self.settings.computer_vision_server = server;
+        match settings::save_settings(&self.settings) {
+            Ok(_) => (),
+            Err(error) => log::error!("{}", error),
+        }
+    }
+
+    pub fn set_text_server(&mut self, server: String) {
+        self.settings.text_server = server;
         match settings::save_settings(&self.settings) {
             Ok(_) => (),
             Err(error) => log::error!("{}", error),
@@ -150,7 +172,7 @@ impl Aspargus {
                 video.path
             );
             match run_computer_vision_model_for_video(
-                &self.ollama,
+                &self.cv_ollama,
                 &self.settings.computer_vision_model,
                 video,
             )
@@ -175,7 +197,9 @@ impl Aspargus {
                 self.videos_number,
                 video.path
             );
-            match run_resume_model_for_video(&self.ollama, &self.settings.text_model, video).await {
+            match run_resume_model_for_video(&self.text_ollama, &self.settings.text_model, video)
+                .await
+            {
                 Ok(resume) => {
                     log::info!(
                         "{}/{} - Title: {}",
@@ -330,7 +354,7 @@ async fn run_computer_vision_model_for_video(
             return Ok(res.response);
         }
         Err(err) => {
-            log::debug!("Error in run_computer_vision_model_for_video: {}", err);
+            log::debug!("Error in run_computer_vision_model_for_video: {}", err); //TODO push the error to the front
             return Err(anyhow::anyhow!(
                 "Couldn't generate answer from computer vision model for file: {}",
                 video.path

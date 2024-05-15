@@ -8,6 +8,14 @@ use std::{
 
 use super::Video;
 
+/// Lists the file paths matching a specific pattern, for retreiving the video thumbnails.
+///
+/// ### Parameters
+/// - `temp_folder`: The temp folder where the images are situated.
+/// - `video_id`: The id of the video, which prefixes the thumbnails' file names.
+///
+/// ### Returns
+/// An array of paths to the thumbnails.
 pub fn list_matching_files(temp_folder: &str, video_id: &str) -> Vec<String> {
     let mut filename_regex = video_id.to_string();
     filename_regex.push_str("_[0-9]*.png");
@@ -28,6 +36,10 @@ pub fn list_matching_files(temp_folder: &str, video_id: &str) -> Vec<String> {
     matching_files
 }
 
+/// Retreives the application's folders, and creates them if they do not exist.
+///
+/// ### Returns
+/// A tuple with the paths to the working folder and the temp folder.
 pub fn make_app_folders() -> anyhow::Result<(String, String)> {
     if let Some(proj_dirs) = ProjectDirs::from("ai", "aspargus", "Aspargus") {
         log::debug!("Config dir: {}", proj_dirs.config_dir().to_str().unwrap());
@@ -53,6 +65,14 @@ pub fn make_app_folders() -> anyhow::Result<(String, String)> {
     }
 }
 
+/// Creates a new path in order to rename a file.
+///
+/// ### Parameters
+/// - `file_path`: The current file path.
+/// - `new_name`: The new file name.
+///
+/// ### Returns
+/// The new path.
 pub fn create_new_path(file_path: &str, new_name: &str) -> String {
     let the_file_path = Path::new(file_path);
     let parent = the_file_path.parent();
@@ -68,6 +88,13 @@ pub fn create_new_path(file_path: &str, new_name: &str) -> String {
     new_path.to_str().unwrap_or(file_path).to_string()
 }
 
+/// Gets the file name from the path.
+///
+/// ### Parameters
+/// - `file_path`: The current file path.
+///
+/// ### Returns
+/// The file name.
 pub fn get_file_name(file_path: &str) -> String {
     let the_file_path = Path::new(file_path);
     let file_name = the_file_path.file_stem();
@@ -78,6 +105,17 @@ pub fn get_file_name(file_path: &str) -> String {
         .to_string()
 }
 
+/// Renames a file.
+///
+/// ### Parameters
+/// - `original_path`: The current file path.
+/// - `new_name`: The new file name.
+///
+/// ### Returns
+/// An empty Result in case of success.
+///
+/// ### Errors
+/// Returns an error if the rename operation fails.
 pub fn rename_file(original_path: &str, new_path: &str) -> anyhow::Result<()> {
     match fs::rename(original_path, new_path) {
         Ok(()) => Ok(()),
@@ -88,6 +126,14 @@ pub fn rename_file(original_path: &str, new_path: &str) -> anyhow::Result<()> {
     }
 }
 
+/// Creates a new file name for a video based on a template.
+///
+/// ### Parameters
+/// - `video`: The video to rename.
+/// - `template`: The new file name template.
+///
+/// ### Returns
+/// A new file name.
 pub fn create_new_file_name(video: &Video, template: &str) -> String {
     let creation_date = video.creation_date;
     let mut new_name = template.to_string();
@@ -101,6 +147,16 @@ pub fn create_new_file_name(video: &Video, template: &str) -> String {
     new_name
 }
 
+/// Filters the content of a directory based on a start and end file namen (alphabetically).
+///
+/// ### Parameters
+/// - `dir_path`: The path of the directory.
+/// - `file_name_start`: The first file to be selected, None if we start from the beginning.
+/// - `file_name_end`: TThe last file to be selected, None if we finish at the end.
+///
+/// ### Returns
+/// A list of file paths. If the directory doesn't exist or if it is empty, an empty list is returned.
+///
 pub fn filter_files_in_dir(
     dir_path: &PathBuf,
     file_name_start: Option<&str>,

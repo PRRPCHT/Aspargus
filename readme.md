@@ -19,6 +19,7 @@ Aspargus also uses [FFMPEG](https://ffmpeg.org/) and FFPROBE to extract frames f
 Aspargus runs in your terminal and therefore takes arguments to execute :
 
 - List of video files (optional). A Space separated list of paths to the videos.
+
 - `-f` or `--folder` (optional): The folder where the videos are stored. Used alternatively with the list of videos, in order to avoid to specify all files in one go.
 - `-s` or `--start` (optional): Used together with the `-f` or `--folder` arguments, to specify which files in the list should be used as starting point (including), in an alphabetical order. If not specified, Aspargus begin its work from the first file (alphabetically) from the folder provided by `-f` or `--folder` arguments.
 - `-e` or `--end` (optional): Used together with the `-f` or `--folder` arguments, to specify which files in the list should be used as ending point (including), in an alphabetical order. If not specified, Aspargus end its work on the last file (alphabetically) from the folder provided by `-f` or `--folder` arguments.

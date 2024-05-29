@@ -12,7 +12,7 @@ Some LLMs can do both the Computer Vision part and the metadata generation very 
 
 We can recommend LlaVa-Llama3 and Mistral as models (they are the default models actually) but you can use any other model if you want. Please make sure that Ollama is installed and running on your machine with the proper models downloaded before running Aspargus. Please refer to [Ollama](https://ollama.com/) documentation on how to download a model.
 
-Aspargus also uses [FFMPEG](https://ffmpeg.org/) and FFPROBE to extract frames from the videos. Please make sure that FFMPEG and FFPROBE are installed on your machine and in the path before running Aspargus.
+Aspargus also uses [FFMPEG](https://ffmpeg.org/) and FFPROBE to extract frames from the videos. Please make sure that FFMPEG and FFPROBE are installed on your machine and in the path before running Aspargus. Aspargus will stop executing if they are not present.
 
 ## How to run Aspargus?
 

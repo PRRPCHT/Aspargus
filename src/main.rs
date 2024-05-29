@@ -333,11 +333,18 @@ async fn main() {
         return;
     }
 
-    aspargus.add_videos(files.unwrap_or_default());
+    match aspargus.add_videos(files.unwrap_or_default()) {
+        Ok(_) => (),
+        Err(error) => { // Any error returned here means we stop the program
+            log::error!("FATAL ERROR: {}", error.to_string());
+            return;
+        },
+    }
+
     match aspargus.extract_frames() {
         Ok(_) => (),
-        Err(e) => {
-            log::error!("{}", e.to_string());
+        Err(error) => {
+            log::error!("FATAL ERROR: {}", error.to_string());
             return;
         },
     }

@@ -75,11 +75,11 @@ impl Video {
     ///
     /// ### Returns
     /// A new Video.
-    pub fn new(path: String, numeric_id: i32) -> Self {
+    pub fn new(path: String, numeric_id: i32) -> anyhow::Result<Self> {
         let id = md5::hash(&path).to_hex_lowercase();
-        let (duration, creation_date) = get_video_metadata(path.as_str()).unwrap_or_default();
+        let (duration, creation_date) = get_video_metadata(path.as_str())?;
         let gap = get_capture_gap(duration.unwrap_or_default());
-        Self {
+        Ok(Self {
             id,
             path,
             story: String::default(),
@@ -89,7 +89,7 @@ impl Video {
             gap,
             numeric_id,
             skip: false,
-        }
+        })
     }
 }
 
@@ -227,11 +227,12 @@ impl Aspargus {
     /// Add a whole list of videos to be analysed to Aspargus.
     /// ### Parameters
     /// - `paths`: The paths of the videos to analyse.
-    pub fn add_videos(&mut self, paths: Vec<String>) {
+    pub fn add_videos(&mut self, paths: Vec<String>) -> anyhow::Result<()> {
         for path in paths {
-            self.add_video(path);
+            let _ = self.add_video(path)?;
             self.videos_number += 1;
         }
+        Ok(())
     }
 
     /// Gets a new numeric ID for a video.
@@ -248,17 +249,31 @@ impl Aspargus {
     /// Add a video to be analysed to Aspargus.
     /// ### Parameters
     /// - `path`: The path of the video to analyse.
-    pub fn add_video(&mut self, path: String) {
+    pub fn add_video(&mut self, path: String) -> anyhow::Result<()> {
         let the_path = Path::new(path.as_str());
         if the_path.is_file() {
-            let video = Video::new(path, self.get_new_video_numeric_id());
-            self.videos.push(video);
+            match Video::new(path.clone(), self.get_new_video_numeric_id()) {
+                Ok(video) => self.videos.push(video),
+                Err(error) => {
+                    if let Some(metadata_extraction_error) = error.downcast_ref::<VideoDataError>()
+                    {
+                        match metadata_extraction_error {
+                            VideoDataError::FFProbeNotFoundError(_) => return Err(anyhow::anyhow!("FFProbe is not found, we're quitting for now. Please install FFMpeg and FFProbe and put them in the path.")),
+                            VideoDataError::FrameExtractionError(_) => log::error!("Error while extracting metadata for: {}, it won't be processed further on.", path),
+                            _ => (), // Other cases are not for frame extraction
+                        }
+                    } else {
+                        log::error!("Error while extracting metadata for: {}, it won't be processed further on.", &path);
+                    }
+                }
+            }
         } else {
-            log::warn!(
+            log::error!(
                 "File {} doesn't exist or is not a file, and therefore will be ignored.",
                 path
             );
         }
+        Ok(())
     }
 
     /// Extract frames for all the videos in the list in the Aspargus struct.
@@ -277,18 +292,19 @@ impl Aspargus {
                     //extract_faces_from_thumbnails(thumbnails);
                 }
                 Err(error) =>  {
-                    if let Some(extraction_error) = error.downcast_ref::<FrameExtractionError>() {
+                    if let Some(extraction_error) = error.downcast_ref::<VideoDataError>() {
                         match extraction_error {
-                            FrameExtractionError::FFMpegNotFoundError(_) => {
+                            VideoDataError::FFMpegNotFoundError(_) => {
                                 let mut holder = error_holder.lock().unwrap();
                                 if holder.is_none() { // Only capture the first error
                                     *holder = Some(anyhow::anyhow!("FFMpeg is not found, we're quitting for now. Please install FFMpeg and FFProbe and put them in the path."));
                                 }
                             },
-                            FrameExtractionError::ExtractionError(_) => {
+                            VideoDataError::FrameExtractionError(_) => {
                                 video.skip = true;
                                 log::error!("{}/{} - Error while extracting frames for: {}, it won't be processed further on.", video.numeric_id, self.videos_number, error)
                             },
+                            _ => (), // Other cases are not for frame extraction
                         }
                     } else {
                         log::error!("{}/{} - Error while extracting frames for: {}, it won't be processed further on.", video.numeric_id, self.videos_number, error)
@@ -477,19 +493,26 @@ impl Aspargus {
 }
 
 #[derive(Debug)]
-enum FrameExtractionError {
+enum VideoDataError {
     FFMpegNotFoundError(String),
-    ExtractionError(String),
+    FrameExtractionError(String),
+    FFProbeNotFoundError(String),
+    MetadataExtractionError(String),
 }
 
-impl std::error::Error for FrameExtractionError {}
+impl std::error::Error for VideoDataError {}
 
-impl fmt::Display for FrameExtractionError {
+impl fmt::Display for VideoDataError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            FrameExtractionError::FFMpegNotFoundError(ref _cause) => write!(f, "FFMpeg not found."),
-            FrameExtractionError::ExtractionError(ref cause) => {
+            VideoDataError::FFMpegNotFoundError(ref _cause) => write!(f, "FFMpeg not found."),
+            VideoDataError::FrameExtractionError(ref cause) => {
                 write!(f, "Error while extracting the frames for: {}", cause)
+            }
+
+            VideoDataError::FFProbeNotFoundError(ref _cause) => write!(f, "FFProbe not found."),
+            VideoDataError::MetadataExtractionError(ref cause) => {
+                write!(f, "Error while extracting metadata for: {}", cause)
             }
         }
     }
@@ -526,10 +549,10 @@ fn extract_frames_for_video(temp_folder: &str, video: &Video) -> anyhow::Result<
     if status.is_err() {
         if status.err().unwrap().kind() == ErrorKind::NotFound {
             let error_message = "FFMpeg can't be found, we're stopping here. Please install FFMpeg and FFProbe and make sure they're in the path.".to_string();
-            return Err(FrameExtractionError::FFMpegNotFoundError(error_message).into());
+            return Err(VideoDataError::FFMpegNotFoundError(error_message).into());
         } else {
             let error_message = format!("Couldn't run FFmpeg for file {}", video.path);
-            return Err(FrameExtractionError::ExtractionError(error_message).into());
+            return Err(VideoDataError::FrameExtractionError(error_message).into());
         }
     }
 
@@ -716,7 +739,7 @@ async fn run_only_computer_vision_model_for_video(
 /// ### Errors
 /// Returns an error if FFprobe can't be run (e.g. not in the path).
 fn get_video_metadata(video_path: &str) -> anyhow::Result<(Option<f32>, Option<DateTime<Utc>>)> {
-    let output = Command::new("ffprobe")
+    let output = Command::new("ffprobe2")
         .arg("-v")
         .arg("error")
         .arg("-show_entries")
@@ -726,14 +749,20 @@ fn get_video_metadata(video_path: &str) -> anyhow::Result<(Option<f32>, Option<D
         .arg("-of")
         .arg("default=noprint_wrappers=1:nokey=1")
         .arg(video_path)
-        .output()?;
+        .output();
 
-    if !output.status.success() {
-        return Err(anyhow::Error::msg(format!(
-            "Couldn't run FFprobe for file {}",
-            video_path
-        )));
-    }
+    let output = match output {
+        Ok(the_output) => the_output,
+        Err(error) => {
+            if error.kind() == ErrorKind::NotFound {
+                let error_message = "FFProbe can't be found, we're stopping here. Please install FFMpeg and FFProbe and make sure they're in the path.".to_string();
+                return Err(VideoDataError::FFProbeNotFoundError(error_message).into());
+            } else {
+                let error_message = format!("Couldn't run FFmpeg for file {}", video_path);
+                return Err(VideoDataError::MetadataExtractionError(error_message).into());
+            }
+        }
+    };
 
     let binding = String::from_utf8(output.stdout).unwrap();
     let mut set = HashSet::new();

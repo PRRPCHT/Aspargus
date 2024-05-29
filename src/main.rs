@@ -334,7 +334,14 @@ async fn main() {
     }
 
     aspargus.add_videos(files.unwrap_or_default());
-    aspargus.extract_frames();
+    match aspargus.extract_frames() {
+        Ok(_) => (),
+        Err(e) => {
+            log::error!("{}", e.to_string());
+            return;
+        },
+    }
+        
     if aspargus.is_two_steps() {
         aspargus.run_computer_vision_model().await;
         aspargus.run_resume_model().await;

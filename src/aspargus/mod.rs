@@ -8,9 +8,11 @@ use ollama_rs::Ollama;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashSet;
-use std::fs;
-use std::path::PathBuf;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
+use std::{fmt, fs};
 mod image_resizer;
 use base64::prelude::*;
 use rayon::prelude::*;
@@ -60,6 +62,8 @@ pub struct Video {
     gap: i32,
     #[serde(skip_serializing)]
     numeric_id: i32,
+    #[serde(skip_serializing)]
+    skip: bool,
 }
 
 impl Video {
@@ -84,6 +88,7 @@ impl Video {
             creation_date: creation_date.unwrap_or_default(),
             gap,
             numeric_id,
+            skip: false,
         }
     }
 }
@@ -244,12 +249,21 @@ impl Aspargus {
     /// ### Parameters
     /// - `path`: The path of the video to analyse.
     pub fn add_video(&mut self, path: String) {
-        let video = Video::new(path, self.get_new_video_numeric_id());
-        self.videos.push(video);
+        let the_path = Path::new(path.as_str());
+        if the_path.is_file() {
+            let video = Video::new(path, self.get_new_video_numeric_id());
+            self.videos.push(video);
+        } else {
+            log::warn!(
+                "File {} doesn't exist or is not a file, and therefore will be ignored.",
+                path
+            );
+        }
     }
 
     /// Extract frames for all the videos in the list in the Aspargus struct.
-    pub fn extract_frames(&mut self) {
+    pub fn extract_frames(&mut self) -> anyhow::Result<()> {
+        let error_holder = Arc::new(Mutex::new(None));
         self.videos.par_iter_mut().for_each(|video| {
             log::info!(
                 "{}/{} - Extracting frames for {}",
@@ -262,39 +276,67 @@ impl Aspargus {
                     video.thumbnails = thumbnails;
                     //extract_faces_from_thumbnails(thumbnails);
                 }
-                Err(error) => log::error!(
-                    "{}/{} - Error while extracting frames: {}",
-                    video.numeric_id,
-                    self.videos_number,
-                    error
-                ),
+                Err(error) =>  {
+                    if let Some(extraction_error) = error.downcast_ref::<FrameExtractionError>() {
+                        match extraction_error {
+                            FrameExtractionError::FFMpegNotFoundError(_) => {
+                                let mut holder = error_holder.lock().unwrap();
+                                if holder.is_none() { // Only capture the first error
+                                    *holder = Some(anyhow::anyhow!("FFMpeg is not found, we're quitting for now. Please install FFMpeg and FFProbe and put them in the path."));
+                                }
+                            },
+                            FrameExtractionError::ExtractionError(_) => {
+                                video.skip = true;
+                                log::error!("{}/{} - Error while extracting frames for: {}, it won't be processed further on.", video.numeric_id, self.videos_number, error)
+                            },
+                        }
+                    } else {
+                        log::error!("{}/{} - Error while extracting frames for: {}, it won't be processed further on.", video.numeric_id, self.videos_number, error)
+                    }
+                },
             }
         });
+        let mut locked_error: std::sync::MutexGuard<Option<anyhow::Error>> =
+            error_holder.lock().unwrap();
+        if let Some(err) = locked_error.take() {
+            Err(err)
+        } else {
+            Ok(())
+        }
     }
 
     /// Runs the computer vision model for all the videos files. Note that this method must be run before the '''run_resume_model''' method.
     pub async fn run_computer_vision_model(&mut self) {
         for video in &mut self.videos {
-            log::info!(
-                "{}/{} - Running computer vision model for {}",
-                video.numeric_id,
-                self.videos_number,
-                video.path
-            );
-            match run_computer_vision_model_for_video(
-                &self.cv_ollama,
-                &self.settings.computer_vision_model,
-                video,
-            )
-            .await
-            {
-                Ok(story) => video.story = story,
-                Err(error) => log::error!(
-                    "{}/{} - Error while running computer vision model: {}",
+            if video.skip {
+                log::info!(
+                    "{}/{} - Skipping {}",
                     video.numeric_id,
                     self.videos_number,
-                    error
-                ),
+                    video.path
+                );
+            } else {
+                log::info!(
+                    "{}/{} - Running computer vision model for {}",
+                    video.numeric_id,
+                    self.videos_number,
+                    video.path
+                );
+                match run_computer_vision_model_for_video(
+                    &self.cv_ollama,
+                    &self.settings.computer_vision_model,
+                    video,
+                )
+                .await
+                {
+                    Ok(story) => video.story = story,
+                    Err(error) => log::error!(
+                        "{}/{} - Error while running computer vision model: {}",
+                        video.numeric_id,
+                        self.videos_number,
+                        error
+                    ),
+                }
             }
         }
     }
@@ -302,26 +344,35 @@ impl Aspargus {
     /// Runs the computer vision model for all the videos files that is able to provide a full result without running the second step with the resume model.
     pub async fn run_only_computer_vision_model(&mut self) {
         for video in &mut self.videos {
-            log::info!(
-                "{}/{} - Running computer vision model for {}",
-                video.numeric_id,
-                self.videos_number,
-                video.path
-            );
-            match run_only_computer_vision_model_for_video(
-                &self.cv_ollama,
-                &self.settings.computer_vision_model,
-                video,
-            )
-            .await
-            {
-                Ok(resume) => video.resume = resume,
-                Err(error) => log::error!(
-                    "{}/{} - Error while running computer vision model: {}",
+            if video.skip {
+                log::info!(
+                    "{}/{} - Skipping {}",
                     video.numeric_id,
                     self.videos_number,
-                    error
-                ),
+                    video.path
+                );
+            } else {
+                log::info!(
+                    "{}/{} - Running computer vision model for {}",
+                    video.numeric_id,
+                    self.videos_number,
+                    video.path
+                );
+                match run_only_computer_vision_model_for_video(
+                    &self.cv_ollama,
+                    &self.settings.computer_vision_model,
+                    video,
+                )
+                .await
+                {
+                    Ok(resume) => video.resume = resume,
+                    Err(error) => log::error!(
+                        "{}/{} - Error while running computer vision model: {}",
+                        video.numeric_id,
+                        self.videos_number,
+                        error
+                    ),
+                }
             }
         }
     }
@@ -329,42 +380,55 @@ impl Aspargus {
     /// Runs the text model for all the videos files based on the computer vision model's output.
     pub async fn run_resume_model(&mut self) {
         for video in &mut self.videos {
-            log::info!(
-                "{}/{} - Running resume model for {}",
-                video.numeric_id,
-                self.videos_number,
-                video.path
-            );
-            match run_resume_model_for_video(&self.text_ollama, &self.settings.text_model, video)
-                .await
-            {
-                Ok(resume) => {
-                    log::info!(
-                        "{}/{} - Title: {}",
-                        video.numeric_id,
-                        self.videos_number,
-                        resume.title
-                    );
-                    log::info!(
-                        "{}/{} - Description: {}",
-                        video.numeric_id,
-                        self.videos_number,
-                        resume.description
-                    );
-                    log::info!(
-                        "{}/{} - Keywords: {}",
-                        video.numeric_id,
-                        self.videos_number,
-                        resume.keywords.join(", ")
-                    );
-                    video.resume = resume;
-                }
-                Err(error) => log::error!(
-                    "{}/{} - Error while running resume model: {}",
+            if video.skip {
+                log::info!(
+                    "{}/{} - Skipping {}",
                     video.numeric_id,
                     self.videos_number,
-                    error
-                ),
+                    video.path
+                );
+            } else {
+                log::info!(
+                    "{}/{} - Running resume model for {}",
+                    video.numeric_id,
+                    self.videos_number,
+                    video.path
+                );
+                match run_resume_model_for_video(
+                    &self.text_ollama,
+                    &self.settings.text_model,
+                    video,
+                )
+                .await
+                {
+                    Ok(resume) => {
+                        log::info!(
+                            "{}/{} - Title: {}",
+                            video.numeric_id,
+                            self.videos_number,
+                            resume.title
+                        );
+                        log::info!(
+                            "{}/{} - Description: {}",
+                            video.numeric_id,
+                            self.videos_number,
+                            resume.description
+                        );
+                        log::info!(
+                            "{}/{} - Keywords: {}",
+                            video.numeric_id,
+                            self.videos_number,
+                            resume.keywords.join(", ")
+                        );
+                        video.resume = resume;
+                    }
+                    Err(error) => log::error!(
+                        "{}/{} - Error while running resume model: {}",
+                        video.numeric_id,
+                        self.videos_number,
+                        error
+                    ),
+                }
             }
         }
     }
@@ -412,6 +476,25 @@ impl Aspargus {
     }
 }
 
+#[derive(Debug)]
+enum FrameExtractionError {
+    FFMpegNotFoundError(String),
+    ExtractionError(String),
+}
+
+impl std::error::Error for FrameExtractionError {}
+
+impl fmt::Display for FrameExtractionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            FrameExtractionError::FFMpegNotFoundError(ref _cause) => write!(f, "FFMpeg not found."),
+            FrameExtractionError::ExtractionError(ref cause) => {
+                write!(f, "Error while extracting the frames for: {}", cause)
+            }
+        }
+    }
+}
+
 /// Extract frames for a video.
 ///
 /// ### Parameters
@@ -441,10 +524,13 @@ fn extract_frames_for_video(temp_folder: &str, video: &Video) -> anyhow::Result<
         .stderr(Stdio::null());
     let status = ffmpeg_command.status();
     if status.is_err() {
-        return Err(anyhow::Error::msg(format!(
-            "Couldn't run FFmpeg for file {}",
-            video.path
-        )));
+        if status.err().unwrap().kind() == ErrorKind::NotFound {
+            let error_message = "FFMpeg can't be found, we're stopping here. Please install FFMpeg and FFProbe and make sure they're in the path.".to_string();
+            return Err(FrameExtractionError::FFMpegNotFoundError(error_message).into());
+        } else {
+            let error_message = format!("Couldn't run FFmpeg for file {}", video.path);
+            return Err(FrameExtractionError::ExtractionError(error_message).into());
+        }
     }
 
     let thumbnails = file_management::list_matching_files(temp_folder, video.id.as_str());

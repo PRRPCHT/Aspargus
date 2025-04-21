@@ -4,7 +4,7 @@ use base64::prelude::*;
 use chrono::{DateTime, Utc};
 use ollama_rs::generation::completion::request::GenerationRequest;
 use ollama_rs::generation::images::Image;
-use ollama_rs::generation::options::GenerationOptions;
+use ollama_rs::models::ModelOptions;
 use ollama_rs::Ollama;
 use regex::Regex;
 use std::collections::HashSet;
@@ -107,7 +107,7 @@ pub(crate) async fn run_resume_model_for_video(
     } else {
         let mut resume_prompt = prompt.to_string();
         resume_prompt += video.story.as_str();
-        let options = GenerationOptions::default().temperature(0.5);
+        let options = ModelOptions::default().temperature(0.5);
         let res = ollama
             .generate(GenerationRequest::new(model.to_string(), resume_prompt).options(options))
             .await;
@@ -159,7 +159,7 @@ pub(crate) async fn run_computer_vision_model_for_video(
             BASE64_STANDARD.encode(&image_data).as_str(),
         ))
     }
-    let options = GenerationOptions::default().temperature(0.5);
+        let options = ModelOptions::default().temperature(0.5);
     let res = ollama
         .generate(
             GenerationRequest::new(model.to_string(), prompt.to_string())
@@ -219,7 +219,7 @@ pub(crate) async fn run_only_computer_vision_model_for_video(
             BASE64_STANDARD.encode(&image_data).as_str(),
         ))
     }
-    let options = GenerationOptions::default().temperature(0.5);
+        let options = ModelOptions::default().temperature(0.5);
     let res = ollama
         .generate(
             GenerationRequest::new(model.to_string(), prompt.to_string())

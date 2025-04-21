@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fmt, fs, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +39,22 @@ pub struct AspargusSettings {
     pub text_server_port: u16,
     #[serde(default = "get_default_two_steps")]
     pub two_steps: bool,
+}
+
+// Implement the fmt::Display trait for AspargusSettings
+impl fmt::Display for AspargusSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "AspargusSettings:")?;
+        writeln!(f, "  Computer Vision Model: {}", self.computer_vision_model)?;
+        writeln!(f, "  Text Model: {}", self.text_model)?;
+        writeln!(f, "  Computer Vision Server: {}:{}", self.computer_vision_server, self.computer_vision_server_port)?;
+        writeln!(f, "  Text Server: {}:{}", self.text_server, self.text_server_port)?;
+        writeln!(f, "  Two Steps mode: {}", self.two_steps)?;
+        writeln!(f, "  Work folder: {}", self.work_folder)?;
+        writeln!(f, "  Temp folder: {}", self.temp_folder)?;
+        writeln!(f, "  Settings path: {}", self.settings_path)?;
+        Ok(())
+    }
 }
 
 /// Gets the default computer vision model.
@@ -102,7 +118,7 @@ pub fn load_settings() -> AspargusSettings {
             aspargus_settings.work_folder = work_folder;
             aspargus_settings.temp_folder = temp_folder;
             aspargus_settings.settings_path = settings_path.to_str().unwrap().to_string();
-            log::debug!("Loaded settings: {:?}", aspargus_settings);
+            log::info!("Loaded settings: {}", aspargus_settings);
             aspargus_settings
         }
         Err(_) => {

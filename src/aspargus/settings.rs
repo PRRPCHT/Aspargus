@@ -63,7 +63,7 @@ impl fmt::Display for AspargusSettings {
 /// The default computer vision model.
 #[doc(hidden)]
 fn get_default_cv_model() -> String {
-    "llava-llama3:latest".to_string()
+    "gemma3:latest".to_string()
 }
 
 /// Gets the default text model.
@@ -72,7 +72,7 @@ fn get_default_cv_model() -> String {
 /// The default text model.
 #[doc(hidden)]
 fn get_default_text_model() -> String {
-    "mistral".to_string()
+    "gemma3:1b".to_string()
 }
 
 /// Gets the default server URL.
@@ -109,9 +109,9 @@ fn get_default_two_steps() -> bool {
 pub fn load_settings() -> AspargusSettings {
     let (work_folder, temp_folder) =
         file_management::make_app_folders().expect("Application folders are created");
-    let mut settings_path = PathBuf::from(work_folder.clone());
+    let mut settings_path = PathBuf::from(&work_folder);
     settings_path.push("settings.json");
-    match fs::read_to_string(settings_path.clone()) {
+    match fs::read_to_string(&settings_path) {
         Ok(settings) => {
             let mut aspargus_settings: AspargusSettings =
                 serde_json::from_str(&settings).expect("Could not deserialize settings");

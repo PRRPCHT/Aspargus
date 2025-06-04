@@ -4,8 +4,6 @@ use clap::{arg, command, value_parser, ArgAction, Command};
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
 use std::path::PathBuf;
-
-use aspargus::aspargus::file_management;
 use aspargus::aspargus::Aspargus;
 
 /// Builds the args parsing.
@@ -282,7 +280,7 @@ fn get_videos_list(
         log::debug!("Value for name: {:?}", the_files);
         Some(the_files)
     } else if let Some(folder) = folder {
-        Some(file_management::filter_files_in_dir(
+        Some(Aspargus::filter_files_in_dir(
             folder, start_file, end_file,
         ))
     } else {
@@ -327,7 +325,7 @@ async fn main() {
         );
         return;
     }
-
+   
     if files.is_none() {
         log::error!("No video files to analyse, we're quitting.");
         return;

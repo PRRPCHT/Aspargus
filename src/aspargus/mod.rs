@@ -8,11 +8,37 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use video::Video;
+use std::fmt;
 mod aspargus_helper;
 mod file_management;
 mod image_resizer;
 mod settings;
 mod video;
+
+
+#[derive(Debug)]
+pub enum AspargusError {
+    Io(String),
+    InvalidFormat(String),
+    ParseError(String),
+    GenericError(String),
+    ProcessingError(String),
+    // Add more variants as needed
+}
+
+impl fmt::Display for AspargusError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AspargusError::Io(msg) => write!(f, "IO error: {}", msg),
+            AspargusError::InvalidFormat(msg) => write!(f, "Invalid format: {}", msg),
+            AspargusError::ParseError(msg) => write!(f, "Parse error: {}", msg),
+            AspargusError::GenericError(msg) => write!(f, "Generic error: {}", msg),
+            AspargusError::ProcessingError(msg) => write!(f, "Processing error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for AspargusError {}
 
 /// Represents an Aspargus instance.
 ///
@@ -148,10 +174,15 @@ impl Aspargus {
     /// Add a whole list of videos to be analysed to Aspargus.
     /// ### Parameters
     /// - `paths`: The paths of the videos to analyse.
-    pub fn add_videos(&mut self, paths: Vec<String>) -> anyhow::Result<()> {
+    pub fn add_videos(&mut self, paths: Vec<String>) -> Result<(), AspargusError> { 
         for path in paths {
-            let _ = self.add_video(path)?;
-            self.videos_number += 1;
+            match self.add_video(path) {
+                Ok(_) => self.videos_number += 1,
+                Err(error) => {
+                    log::error!("Error while adding video: {}", error);
+                    return Err(error);
+                }
+            }
         }
         Ok(())
     }
@@ -177,8 +208,17 @@ impl Aspargus {
     /// Gets the list of computer vision models available on the server.
     /// ### Returns
     /// A list of computer vision models available on the server.
-    pub async fn get_computer_vision_models_list(&self) -> anyhow::Result<Vec<String>> {
-        aspargus_helper::get_models_for_server(&self.cv_ollama).await
+    pub async fn get_computer_vision_models_list(&self) -> Result<Vec<String>, AspargusError> { 
+        match aspargus_helper::get_models_for_server(&self.cv_ollama).await {
+            Ok(models) => Ok(models),
+            Err(error) => {
+                log::error!("Error while getting computer vision models list: {}", error);
+                Err(AspargusError::Io(format!(
+                    "Error while getting computer vision models list: {}",
+                    error
+                )))
+            }
+        }
     }
 
     /// Gets the name of the currently set text model.
@@ -191,14 +231,23 @@ impl Aspargus {
     /// Gets the list of text models available on the server.
     /// ### Returns
     /// A list of text models available on the server.
-    pub async fn get_text_models_list(&self) -> anyhow::Result<Vec<String>> {
-        aspargus_helper::get_models_for_server(&self.text_ollama).await
+    pub async fn get_text_models_list(&self) -> Result<Vec<String>, AspargusError> { 
+        match aspargus_helper::get_models_for_server(&self.text_ollama).await {
+            Ok(models) => Ok(models),
+            Err(error) => {
+                log::error!("Error while getting text models list: {}", error);
+                Err(AspargusError::Io(format!(
+                    "Error while getting text models list: {}",
+                    error
+                )))
+            }
+        }
     }
 
     /// Add a video to be analysed to Aspargus.
     /// ### Parameters
     /// - `path`: The path of the video to analyse.
-    pub fn add_video(&mut self, path: String) -> anyhow::Result<()> {
+    pub fn add_video(&mut self, path: String) -> Result<(), AspargusError> {
         let the_path = Path::new(path.as_str());
         if the_path.is_file() {
             match Video::new(path.clone(), self.get_new_video_numeric_id()) {
@@ -207,12 +256,13 @@ impl Aspargus {
                     if let Some(metadata_extraction_error) = error.downcast_ref::<VideoDataError>()
                     {
                         match metadata_extraction_error {
-                            VideoDataError::FFProbeNotFoundError(_) => return Err(anyhow::anyhow!("FFProbe is not found, we're quitting for now. Please install FFMpeg and FFProbe and put them in the path.")),
+                        VideoDataError::FFProbeNotFoundError(_) => return Err(AspargusError::GenericError("FFProbe is not found, we're quitting for now. Please install FFMpeg and FFProbe and put them in the path.".to_string())),
                             VideoDataError::FrameExtractionError(_) => log::error!("Error while extracting metadata for: {}, it won't be processed further on.", path),
                             _ => (), // Other cases are not for frame extraction
                         }
                     } else {
                         log::error!("Error while extracting metadata for: {}, it won't be processed further on.", &path);
+                        return Err(AspargusError::ProcessingError(format!("Error while extracting metadata for: {}", &path)))
                     }
                 }
             }
@@ -221,12 +271,16 @@ impl Aspargus {
                 "File {} doesn't exist or is not a file, and therefore will be ignored.",
                 path
             );
+            return Err(AspargusError::ProcessingError(format!(
+                "File {} doesn't exist or is not a file, and therefore will be ignored.",
+                path
+            )));
         }
         Ok(())
     }
 
     /// Extract frames for all the videos in the list in the Aspargus struct.
-    pub fn extract_frames(&mut self) -> anyhow::Result<()> {
+    pub fn extract_frames(&mut self) -> Result<(), AspargusError> { 
         let error_holder = Arc::new(Mutex::new(None));
         self.videos.par_iter_mut().for_each(|video| {
             log::info!(
@@ -264,7 +318,7 @@ impl Aspargus {
         let mut locked_error: std::sync::MutexGuard<Option<anyhow::Error>> =
             error_holder.lock().unwrap();
         if let Some(err) = locked_error.take() {
-            Err(err)
+            Err(AspargusError::ProcessingError(format!("Error while extracting frames: {}", err.to_string())))
         } else {
             Ok(())
         }
@@ -408,9 +462,27 @@ impl Aspargus {
     ///
     /// ### Errors
     /// Returns an error if the export fails.
-    pub fn export_to_json(&self, path: &str) -> anyhow::Result<()> {
-        let contents = serde_json::to_string_pretty(&self.videos)?;
-        let _ = fs::write(path, contents)?;
+    pub fn export_to_json(&self, path: &str) -> Result<(), AspargusError> { 
+        let contents = match serde_json::to_string_pretty(&self.videos) {
+            Ok(json) => json,
+            Err(_) => {
+                return Err(AspargusError::GenericError(
+                    "Error while serializing the videos to JSON".to_string(),
+                ))
+            }
+        };
+        match fs::write(path, contents) {
+            Ok(_) => {
+                log::info!("Exported results to {}", path);
+            }
+            Err(error) => {
+                log::error!("Error while exporting results to JSON: {}", error);
+                return Err(AspargusError::Io(format!(
+                    "Error while exporting results to JSON: {}",
+                    error
+                )));
+            }
+        };
         Ok(())
     }
 

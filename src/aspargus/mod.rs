@@ -9,7 +9,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use video::Video;
 mod aspargus_helper;
-pub(crate) mod file_management;
+pub mod file_management;
 mod image_resizer;
 mod settings;
 mod video;
@@ -22,7 +22,7 @@ mod video;
 /// - `cv_ollama`: The computer vision model prompter.
 /// - `text_ollama`: The text model prompter.
 /// - `videos_number`: The number of videos in the queue.
-pub(crate) struct Aspargus {
+pub struct Aspargus {
     videos: Vec<Video>,
     settings: AspargusSettings,
     cv_ollama: Ollama,

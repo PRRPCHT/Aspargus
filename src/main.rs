@@ -4,9 +4,9 @@ use clap::{arg, command, value_parser, ArgAction, Command};
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
 use std::path::PathBuf;
-mod aspargus;
-use aspargus::file_management;
-use aspargus::Aspargus;
+
+use aspargus::aspargus::file_management;
+use aspargus::aspargus::Aspargus;
 
 /// Builds the args parsing.
 ///

@@ -15,22 +15,19 @@ mod image_resizer;
 mod settings;
 mod video;
 
-
+/// Represents an Aspargus error.
 #[derive(Debug)]
 pub enum AspargusError {
     Io(String),
-    InvalidFormat(String),
     ParseError(String),
     GenericError(String),
     ProcessingError(String),
-    // Add more variants as needed
 }
 
 impl fmt::Display for AspargusError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AspargusError::Io(msg) => write!(f, "IO error: {}", msg),
-            AspargusError::InvalidFormat(msg) => write!(f, "Invalid format: {}", msg),
             AspargusError::ParseError(msg) => write!(f, "Parse error: {}", msg),
             AspargusError::GenericError(msg) => write!(f, "Generic error: {}", msg),
             AspargusError::ProcessingError(msg) => write!(f, "Processing error: {}", msg),

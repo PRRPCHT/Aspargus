@@ -167,6 +167,34 @@ impl Aspargus {
         }
     }
 
+    /// Gets the name of the currently set computer vision model.
+    /// ### Returns
+    /// The name of the currently set computer vision model.
+    pub fn get_computer_vision_model(&self) -> String {
+        self.settings.computer_vision_model.clone()
+    }
+
+    /// Gets the list of computer vision models available on the server.
+    /// ### Returns
+    /// A list of computer vision models available on the server.
+    pub async fn get_computer_vision_models_list(&self) -> anyhow::Result<Vec<String>> {
+        aspargus_helper::get_models_for_server(&self.cv_ollama).await
+    }
+
+    /// Gets the name of the currently set text model.
+    /// ### Returns
+    /// The name of the currently set text model.
+    pub fn get_text_model(&self) -> String {
+        self.settings.text_model.clone()
+    }
+
+    /// Gets the list of text models available on the server.
+    /// ### Returns
+    /// A list of text models available on the server.
+    pub async fn get_text_models_list(&self) -> anyhow::Result<Vec<String>> {
+        aspargus_helper::get_models_for_server(&self.text_ollama).await
+    }
+
     /// Add a video to be analysed to Aspargus.
     /// ### Parameters
     /// - `path`: The path of the video to analyse.

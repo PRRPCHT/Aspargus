@@ -350,3 +350,16 @@ fn extract_json(input: &str) -> Option<String> {
     let re = Regex::new(r"\{(?:[^{}]*|(?R))*\}").unwrap();
     re.find(input).map(|mat| mat.as_str().to_string())
 }
+
+/// Gets the names of the models available on an Ollama server.
+///
+/// ### Parameters
+/// - `ollama`: The ollama instance refering to the server to poll.   
+///
+/// ### Returns
+/// A Vec<String> of models names.
+pub async fn get_models_for_server(ollama: &Ollama) -> anyhow::Result<Vec<String>> {
+    let models =  ollama.list_local_models().await?;
+    let model_names: Vec<String> = models.into_iter().map(|m| m.name).collect();
+    Ok(model_names)
+}

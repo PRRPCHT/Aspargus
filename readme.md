@@ -8,9 +8,9 @@ The idea behind Aspargus is to have an automated solution to properly identify h
 
 Aspargus uses [Ollama](https://ollama.com/) and LLMs to first understand what's happening in the video and then create a title, a description and keywords for that video.
 
-Some LLMs can do both the Computer Vision part and the metadata generation very well such as Llava-Llama3 and therefore only one pass is needed. Otherwise two passes are needed, fist with a dedicated Computer Vision model, then with Text Generation model.
+Some LLMs can do both the Computer Vision part and the metadata generation very well such as Gemma3 or Llava-Llama3 and therefore only one pass is needed. Otherwise two passes are needed, fist with a dedicated Computer Vision model, then with Text Generation model.
 
-We can recommend LlaVa-Llama3 and Mistral as models (they are the default models actually) but you can use any other model if you want. Please make sure that Ollama is installed and running on your machine with the proper models downloaded before running Aspargus. Please refer to [Ollama](https://ollama.com/) documentation on how to download a model.
+We can recommend Gemma3 as model (it the default model actually) but you can use any other model if you want. Please make sure that Ollama is installed and running on your machine with the proper models downloaded before running Aspargus. Please refer to [Ollama](https://ollama.com/) documentation on how to download a model.
 
 Aspargus also uses [FFMPEG](https://ffmpeg.org/) and FFPROBE to extract frames from the videos. Please make sure that FFMPEG and FFPROBE are installed on your machine and in the path before running Aspargus. Aspargus will stop executing if they are not present.
 
@@ -47,7 +47,7 @@ At least the path of a video file or a path to a folder must be given in order f
   ```
   2024-04-16_my-video-title_keyword1-keyword2-keyword3
   ```
-  It also specifies `llama3:instruct` as the new text processing model.
+  It also specifies `llama3:instruct` as the new (optional) text processing model.
 - `aspargus /path/to/video1.mp4 /another/path/to/video2.mp4 -j /third/path/to/file.json` analyzes two videos and stores the metadata in the specified JSON file.
 
 ## Constraints, known issues and limitations

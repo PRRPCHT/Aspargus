@@ -3,7 +3,8 @@ use clap::ArgMatches;
 use clap::{arg, command, value_parser, ArgAction, Command};
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use aspargus::aspargus::Aspargus;
 
 /// Builds the args parsing.
@@ -280,7 +281,7 @@ fn get_videos_list(
         log::debug!("Value for name: {:?}", the_files);
         Some(the_files)
     } else if let Some(folder) = folder {
-        Some(Aspargus::filter_files_in_dir(
+        Some(filter_files_in_dir(
             folder, start_file, end_file,
         ))
     } else {
@@ -363,5 +364,73 @@ async fn main() {
             Ok(_) => (),
             Err(error) => log::error!("Error while exporting the JSON file: {}", error),
         };
+    }
+}
+
+
+
+/// Filters the content of a directory based on a start and end file namen (alphabetically).
+///
+/// ### Parameters
+/// - `dir_path`: The path of the directory.
+/// - `file_name_start`: The first file to be selected, None if we start from the beginning.
+/// - `file_name_end`: TThe last file to be selected, None if we finish at the end.
+///
+/// ### Returns
+/// A list of file paths. If the directory doesn't exist or if it is empty, an empty list is returned.
+///
+fn filter_files_in_dir(
+    dir_path: &PathBuf,
+    file_name_start: Option<&str>,
+    file_name_end: Option<&str>,
+) -> Vec<String> {
+    let path = Path::new(dir_path);
+    let mut filtered_paths = Vec::new();
+
+    // Check if the path exists and is a directory
+    if path.exists() && path.is_dir() {
+        if let Ok(entries) = fs::read_dir(path) {
+            for entry in entries.filter_map(Result::ok) {
+                let path = entry.path();
+                if path.is_file() {
+                    let file_name: Option<String> = match path_to_string(&path) {
+                        Ok(the_file_name) => Some(the_file_name),
+                        Err(_) => {
+                            log::error!("This {:?} will be ignored due to an error", path);
+                            None
+                        }
+                    };
+                    if file_name.is_some() {
+                        let file_name = file_name.unwrap();
+                        let file_name = file_name.as_str();
+                        // Check if the file name matches the start and end constraints
+                        let matches_start = file_name_start
+                            .map(|start| file_name >= start)
+                            .unwrap_or(true); // If no start constraint, always true
+
+                        let matches_end = file_name_end.map(|end| file_name <= end).unwrap_or(true); // If no end constraint, always true
+
+                        if matches_start && matches_end {
+                            if let Some(path_str) = path.to_str() {
+                                filtered_paths.push(path_str.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    filtered_paths
+}
+
+fn path_to_string(path: &PathBuf) -> anyhow::Result<String> {
+    if let Some(file_name_inter) = path.file_name() {
+        if let Some(file_name) = file_name_inter.to_str() {
+            Ok(file_name.to_string())
+        } else {
+            Err(anyhow::anyhow!("No story to resume for : {:?}", path))
+        }
+    } else {
+        Err(anyhow::anyhow!("No story to resume for : {:?}", path))
     }
 }

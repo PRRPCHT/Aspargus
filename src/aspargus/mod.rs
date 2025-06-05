@@ -5,7 +5,7 @@ use ollama_rs::Ollama;
 use rayon::prelude::*;
 use serde_json;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use video::Video;
 use std::fmt;
@@ -508,23 +508,5 @@ impl Aspargus {
             }
         });
     }
-
-/// Filters the content of a directory based on a start and end file namen (alphabetically).
-///
-/// ### Parameters
-/// - `dir_path`: The path of the directory.
-/// - `file_name_start`: The first file to be selected, None if we start from the beginning.
-/// - `file_name_end`: TThe last file to be selected, None if we finish at the end.
-///
-/// ### Returns
-/// A list of file paths. If the directory doesn't exist or if it is empty, an empty list is returned.
-///
-pub fn filter_files_in_dir(
-    dir_path: &PathBuf,
-    file_name_start: Option<&str>,
-    file_name_end: Option<&str>,
-) -> Vec<String> {
-    file_management::filter_files_in_dir(dir_path, file_name_start, file_name_end)
-}
 
 }

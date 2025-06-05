@@ -423,6 +423,11 @@ fn filter_files_in_dir(
     filtered_paths
 }
 
+/// Converts a PathBuf to a String, returning an error if the conversion fails.
+/// ### Parameters
+/// - `path`: The PathBuf to convert.
+/// ### Returns
+/// A Result containing the String representation of the path, or an error if the conversion fails.
 fn path_to_string(path: &PathBuf) -> anyhow::Result<String> {
     if let Some(file_name_inter) = path.file_name() {
         if let Some(file_name) = file_name_inter.to_str() {
